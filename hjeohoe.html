@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Impostor Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .game-container {
+            max-width: 500px;
+            margin: 50px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        button {
+            padding: 10px;
+            margin: 10px 0;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Word Impostor</h1>
+        <div id="start-screen">
+            <button id="create-game-btn">Create New Game</button>
+            <div class="join-game">
+                <input type="text" id="game-code-input" placeholder="Enter game code">
+                <button id="join-game-btn">Join Game</button>
+            </div>
+        </div>
+
+        <div id="lobby-screen" class="hidden">
+            <h2>Game Lobby</h2>
+            <p>Game Code: <span id="game-code"></span></p>
+            <p>Players: <span id="players-list"></span></p>
+            <div id="party-leader-controls">
+                <input type="number" id="rounds-input" placeholder="Set number of rounds">
+                <input type="text" id="normal-word-input" placeholder="Set custom normal word">
+                <input type="text" id="impostor-word-input" placeholder="Set custom impostor word">
+                <button id="add-custom-word-btn">Add Custom Word</button>
+                <button id="start-game-btn">Start Game</button>
+            </div>
+        </div>
+
+        <div id="play-screen" class="hidden">
+            <h2>Round <span id="round-number"></span>/<span id="total-rounds"></span></h2>
+            <p>Your word: <span id="current-word"></span></p>
+            <textarea id="player-response" placeholder="Write something about your word..."></textarea>
+            <button id="submit-response-btn">Submit Response</button>
+            <p id="timer" class="hidden">Time left: <span id="timer-countdown"></span>s</p>
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            phase: 'start',
+            code: '',
+            players: [],
+            partyLeader: '',
+            currentPlayer: '',
+            words: {},
+            impostorIndex: -1,
+            responses: {},
+            round: 0,
+            totalRounds: 3,
+            customNormalWord: '',
+            customImpostorWord: '',
+            wordPool: [
+                { normal: 'Ocean', impostor: 'Sea' },
+                { normal: 'Mountain', impostor: 'Hill' },
+                { normal: 'Dog', impostor: 'Wolf' },
+                { normal: 'Apple', impostor: 'Pear' },
+                { normal: 'Car', impostor: 'Bus' },
+            ],
+            usedWords: [],
+        };
+
+        document.getElementById('create-game-btn').addEventListener('click', createGame);
+        document.getElementById('join-game-btn').addEventListener('click', joinGame);
+        document.getElementById('start-game-btn').addEventListener('click', startGame);
+        document.getElementById('submit-response-btn').addEventListener('click', submitResponse);
+        document.getElementById('add-custom-word-btn').addEventListener('click', addCustomWord);
+
+        function createGame() {
+            const newCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+            const playerName = prompt("Enter your name (Party Leader):");
+            gameState.code = newCode;
+            gameState.players.push(playerName);
+            gameState.partyLeader = playerName;
+            gameState.currentPlayer = playerName;
+            updateLobby();
+            switchPhase('lobby');
+        }
+
+        function joinGame() {
+            const playerName = prompt("Enter your name:");
+            const gameCode = document.getElementById('game-code-input').value;
+            if (gameCode === gameState.code && !gameState.players.includes(playerName)) {
+                gameState.players.push(playerName);
+                gameState.currentPlayer = playerName;
+                updateLobby();
+            } else {
+                alert("Invalid game code or name already taken.");
+            }
+        }
+
+        function startGame() {
+            if (gameState.players.length >= 3) {
+                gameState.round = 1;
+                gameState.totalRounds = parseInt(document.getElementById('rounds-input').value) || 3;
+                const normalWord = document.getElementById('normal-word-input').value;
+                const impostorWord = document.getElementById('impostor-word-input').value;
+                
+                if (normalWord && impostorWord) {
+                    gameState.customNormalWord = normalWord;
+                    gameState.customImpostorWord = impostorWord;
+                }
+
+                assignWords();
+                updatePlayScreen();
+                switchPhase('play');
+            } else {
+                alert("At least 3 players are required.");
+            }
+        }
+
+        function assignWords() {
+            const impostorIndex = Math.floor(Math.random() * gameState.players.length);
+            gameState.impostorIndex = impostorIndex;
+
+            gameState.players.forEach((player, index) => {
+                gameState.words[player] = (index === impostorIndex) ? gameState.customImpostorWord : gameState.customNormalWord;
+            });
+        }
+
+        function addCustomWord() {
+            const normalWord = document.getElementById('normal-word-input').value;
+            const impostorWord = document.getElementById('impostor-word-input').value;
+
+            if (normalWord && impostorWord) {
+                gameState.wordPool.push({ normal: normalWord, impostor: impostorWord });
+            }
+        }
+
+        function submitResponse() {
+            const response = document.getElementById('player-response').value.trim();
+            if (response) {
+                gameState.responses[gameState.currentPlayer] = response;
+                document.getElementById('player-response').value = '';
+                alert("Response submitted!");
+            }
+        }
+
+        function updateLobby() {
+            document.getElementById('game-code').innerText = gameState.code;
+            document.getElementById('players-list').innerText = gameState.players.join(', ');
+        }
+
+        function updatePlayScreen() {
+            document.getElementById('round-number').innerText = gameState.round;
+            document.getElementById('total-rounds').innerText = gameState.totalRounds;
+            document.getElementById('current-word').innerText = gameState.words[gameState.currentPlayer];
+        }
+
+        function switchPhase(phase) {
+            gameState.phase = phase;
+            document.getElementById('start-screen').classList.toggle('hidden', phase !== 'start');
+            document.getElementById('lobby-screen').classList.toggle('hidden', phase !== 'lobby');
+            document.getElementById('play-screen').classList.toggle('hidden', phase !== 'play');
+        }
+    </script>
+</body>
+</html>
